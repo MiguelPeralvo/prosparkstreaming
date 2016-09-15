@@ -20,7 +20,7 @@ object LinearRegressionApp {
     }
     val Seq(appName, batchInterval, hostname, port) = args.toSeq
 
-    val conf = new SparkConf()
+    val conf = new SparkConf().setMaster("local[4]")
       .setAppName(appName)
       .setJars(SparkContext.jarOfClass(this.getClass).toSeq)
 
