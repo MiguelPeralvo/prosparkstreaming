@@ -35,13 +35,16 @@ object LinearRegressionApp {
       .map(f => LabeledPoint(f(0), Vectors.dense(f.slice(1, 5))))
     val test = datastream.transform(rdd => rdd.randomSplit(Array(0.3, 0.7))(0))
     val train = datastream.transformWith(test, (r1: RDD[LabeledPoint], r2: RDD[LabeledPoint]) => r1.subtract(r2)).cache()
+    test.foreachRDD(rdd => println(s"Size of test data: ${rdd.count()}"))
+    train.foreachRDD(rdd => println(s"Size of train data: ${rdd.count()}"))
     val model = new StreamingLinearRegressionWithSGD()
       .setInitialWeights(Vectors.zeros(4))
       .setStepSize(0.0001)
       .setNumIterations(1)
 
     model.trainOn(train)
-    model.predictOnValues(test.map(v => (v.label, v.features))).foreachRDD(rdd => println("MSE: %f".format(rdd
+    model.predictOnValues(test.map(v => (v.label, v.features))).foreachRDD(
+      rdd => println(s"Size: ${rdd.count()}. MSE: %f".format(rdd
       .map(v => math.pow((v._1 - v._2), 2)).mean())))
 
     ssc.start()
