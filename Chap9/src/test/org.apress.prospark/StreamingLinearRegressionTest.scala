@@ -6,9 +6,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.streaming.dstream.DStream
 
-/**
-  * Created by Miguel on 17/09/2016.
-  */
 object StreamingLinearRegressionTest extends BasicStreamingOnlineTest{
 
   def algorithm(ssc: StreamingContext, unfilteredSubstream: DStream[String]): Unit = {
@@ -36,7 +33,8 @@ object StreamingLinearRegressionTest extends BasicStreamingOnlineTest{
     val rddFiles = RddHelper.calculateRddFiles(ssc)
     lines.enqueue(RddHelper.take(rddFiles, 50000, iterationCounter*50000))
 
-    model.predictOnValues(test.map(v => (v.label, v.features))).foreachRDD{
+    val prediction = model.predictOnValues(test.map(v => (v.label, v.features)))
+    prediction.foreachRDD{
       rdd =>
         println(s"Size: ${rdd.count()}. MSE: %f".format(rdd
           .map(v => math.pow((v._1 - v._2), 2)).mean()))
@@ -44,6 +42,8 @@ object StreamingLinearRegressionTest extends BasicStreamingOnlineTest{
         println(s"Iteration Counter: ${iterationCounter}")
         lines.enqueue(RddHelper.take(rddFiles, 50000, iterationCounter*50000))
     }
+
+    prediction.print()
 
   }
 }
