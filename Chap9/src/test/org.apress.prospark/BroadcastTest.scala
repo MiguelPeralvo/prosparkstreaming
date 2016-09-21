@@ -15,7 +15,8 @@ object BroadcastTest extends BasicStreamingOnlineTest{
 
     val rddFiles = RddHelper.calculateRddFiles(ssc)
     lines.enqueue(RddHelper.take(rddFiles, 50000, iterationCounter*50000))
-    var broadcastVar = ssc.sparkContext.broadcast(iterationCounter)
+    var broadcastCounter = ssc.sparkContext.broadcast(iterationCounter)
+    var broadcastTable = ssc.sparkContext.broadcast(RddHelper.take(rddFiles, 1000, iterationCounter*10000))
     val numInputMessages = ssc.sparkContext.accumulator(0L, "Messages consumed")
     val numOutputMessages = ssc.sparkContext.accumulator(0L, "Messages produced")
 
@@ -40,14 +41,18 @@ object BroadcastTest extends BasicStreamingOnlineTest{
       println(s"numOutputMessages: ${numOutputMessages}")
 
       iterationCounter +=1
-      broadcastVar.unpersist(true)
-      broadcastVar = ssc.sparkContext.broadcast(iterationCounter)
+      broadcastCounter.unpersist(true)
+      broadcastCounter = ssc.sparkContext.broadcast(iterationCounter)
       println(s"Iteration Counter: ${iterationCounter}")
+
+      broadcastTable.unpersist(true)
+      broadcastTable = ssc.sparkContext.broadcast(RddHelper.take(rddFiles, 1000, iterationCounter*10000))
+      println(s"Iteration broadcastTable: ${broadcastTable.value}")
 
 
       rdd.foreachPartition{ partitionOfRecords =>
         numOutputMessages += 1
-        println(s"broadcastVar.value: ${broadcastVar.value}")
+        println(s"broadcastCounter.value: ${broadcastCounter.value}")
       }
     })
 
