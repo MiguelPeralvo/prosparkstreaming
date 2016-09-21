@@ -7,8 +7,7 @@ import org.apress.prospark.{BasicStreamingOnlineTest, RddHelper}
 object BroadcastTest extends BasicStreamingOnlineTest{
 
   def algorithm(ssc: StreamingContext, unfilteredSubstream: DStream[String]): Unit = {
-    var iterationCounter = 0
-
+    var iterationCounter: Long = 0
     val substream =  unfilteredSubstream.filter(!_.contains("NaN"))
       .map(_.split(" "))
       .filter(f => f(1) != "0")
@@ -16,9 +15,16 @@ object BroadcastTest extends BasicStreamingOnlineTest{
 
     val rddFiles = RddHelper.calculateRddFiles(ssc)
     lines.enqueue(RddHelper.take(rddFiles, 50000, iterationCounter*50000))
-    val broadcastVar = ssc.sparkContext.broadcast(iterationCounter)
+    var broadcastVar = ssc.sparkContext.broadcast(iterationCounter)
+    val numInputMessages = ssc.sparkContext.accumulator(0L, "Messages consumed")
+    val numOutputMessages = ssc.sparkContext.accumulator(0L, "Messages produced")
 
-    substream.map(f => Vectors.dense(f.slice(1, 5))).repartition(2).foreachRDD(rdd => {
+
+    substream.map(f => Vectors.dense(f.slice(1, 5))).map{
+      x =>
+      numInputMessages += 1
+      x
+    }.repartition(2).foreachRDD(rdd => {
       val stats = Statistics.colStats(rdd)
       println("Count: " + stats.count)
       println("Max: " + stats.max.toArray.mkString(" "))
@@ -28,14 +34,21 @@ object BroadcastTest extends BasicStreamingOnlineTest{
       println("L2-Norm: " + stats.normL2.toArray.mkString(" "))
       println("Number of non-zeros: " + stats.numNonzeros.toArray.mkString(" "))
       println("Varience: " + stats.variance.toArray.mkString(" "))
-      iterationCounter +=1
-      println(s"Iteration Counter: ${iterationCounter}")
       lines.enqueue(RddHelper.take(rddFiles, 50000, iterationCounter*50000))
 
-      rdd.foreachPartition{ partitionOfRecords =>
-        println(broadcastVar.value)
-      }
+      println(s"numInputMessages: ${numInputMessages}")
+      println(s"numOutputMessages: ${numOutputMessages}")
 
+      iterationCounter +=1
+      broadcastVar.unpersist(true)
+      broadcastVar = ssc.sparkContext.broadcast(iterationCounter)
+      println(s"Iteration Counter: ${iterationCounter}")
+
+
+      rdd.foreachPartition{ partitionOfRecords =>
+        numOutputMessages += 1
+        println(s"broadcastVar.value: ${broadcastVar.value}")
+      }
     })
 
   }
